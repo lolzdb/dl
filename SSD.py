@@ -1,60 +1,43 @@
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 import numpy as np
 
-class AnchorBox:
-    def __init__(self,feature_size,anchor_size,feature_key,cell_size,img_size):
-        self.feature_size=feature_size
-        self.anchor_size=anchor_size
-        self.feature_key=feature_key
-        self.cell_size=cell_size
-        self.img_size=img_size
+def encodeBoxs(cell_size,layer_shape,anchor_size):
+    x=range(0,layer_shape['x'])
+    y=range(0,layer_shape['y'])
+    x,y=np.meshgrid(x,y)
+    x=x*cell_size['x']+cell_size['x']/2
+    y = y * cell_size['y'] + cell_size['y'] / 2
+    locate=np.zeros([layer_shape['x'],layer_shape['y'],len(anchor_size),4])
+    locate[:,:,:,0]+=x
+    locate[:,:,:,2]+=x
+    locate[:, :, :, 1] += y
+    locate[:, :, :, 3] += y
+    for i in range(0,len(anchor_size)):
+        locate[:,:,i,0]-=anchor_size[i]['w']/2
+        locate[:, :, i, 2] += anchor_size[i]['w']/2
+        locate[:, :, i, 1] -= anchor_size[i]['h']/2
+        locate[:, :, i, 3] += anchor_size[i]['h']/2
+    return locate
 
-    def getGride(self):
-        result={}
-        for i in self.feature_key:
-            locate=self.getFeatureLocate(i)
-            wh=self.getAncho(i)
-            result[i]=tf.concat([locate,wh],axis=-1)
-        print(result['0'])
-        return result
+def getencode(cell_size,layer_shape,anchor_size,layer):
+    boxencode=[]
+    for i in layer:
+        boxencode.append(cell_size[i],layer_shape[i],anchor_size[i])
+    return boxencode
 
-    def getFeatureLocate(self,feature_key):
-        w = list(range(0, self.feature_size[feature_key]['w']))
-        h = list(range(0, self.feature_size[feature_key]['h']))
-        x, y = tf.meshgrid(w, h)
-        x=tf.cast(x,tf.float32)
-        y = tf.cast(y, tf.float32)
-        x *= self.cell_size[feature_key]
-        y *= self.cell_size[feature_key]
-        x += self.cell_size[feature_key] / 2
-        y += self.cell_size[feature_key] / 2
-        x=tf.expand_dims(x,axis=-1)
-        y=tf.expand_dims(y,axis=-1)
-        locate=tf.expand_dims(tf.concat([x,y],axis=-1),axis=-1)
-        locate=tf.tile(locate,[1,1,1,len(self.anchor_size[feature_key])])
-        print(locate.shape)
-        return locate
-
-    def getAncho(self,feature_key):
-        anchor=np.array(self.anchor_size[feature_key]).astype('float')
-        anchor[:,0]=anchor[:,0]/self.img_size[0]
-        anchor[:, 1] = anchor[:,1] / self.img_size[1]
-        anchor=tf.expand_dims(tf.expand_dims(tf.cast(anchor,tf.float32),axis=0),axis=0)
-        anchor_size=tf.tile(anchor,[self.feature_size[feature_key]['h'],self.feature_size[feature_key]['w'],1,1])
-        print(anchor_size.shape)
-        return anchor_size
-
-
-
-
-def getboxCode(anchor,box,label,threod):
+def getGT(anchor,box,label,threod):
     xmin=anchor[:,:,:,0]-anchor[:,:,:,2]/2
     ymin = anchor[:, :, :, 1] - anchor[:, :, :, 3] / 2
     xmax = anchor[:, :, :, 0] + anchor[:, :, :, 2] / 2
     ymax = anchor[:, :, :, 1] + anchor[:, :, :, 3] / 2
     anchor_arrea=(xmax-xmin)*(ymax-ymin)
     mark=tf.ones(xmin.shape,dtype=tf.float32)
+    rxmin=tf.zeros(xmin.shape)
+    rymin=tf.zeros(xmin.shape)
+    rxmax=tf.zeros(xmin.shape)
+    rymax = tf.zeros(xmin.shape)
+    sr=tf.zeros(xmin.shape)
+    lr=tf.zeros(xmin.shape)
 
     def jaryard(bbox):
         uxmin=tf.maximum(bbox[0],xmin)
@@ -84,17 +67,7 @@ def getboxCode(anchor,box,label,threod):
         rymax = box[i][3] * mask + rymax * (1 - mask)
         i+=1
         return [i,sr,lr,rxmin,rymin,rxmax,rymax]
-
-
-
-
-feature_size={'0':{'w':8,'h':8}}
-anchor_size={'0':[[4,8],[8,4]]}
-cell_size={'0':8}
-img_size=[64,64]
-feature_key=['0']
-with tf.Session() as sess:
-    sess.run(tf.initialize_all_variables())
-    a=AnchorBox(feature_size,anchor_size,feature_key,cell_size,img_size)
-    result=a.getGride()
-    gride=sess.run(result['0'])
+    i=tf.constant(0,tf.int32)
+    [i,sr,lr,rxmin,rymin,rxmax,rymax]=tf.while_loop([i,sr,lr,rxmin,rymin,rxmax,rymax])
+    encode=tf.concat([rxmin,rymin,rxmax,rymax],axis=-1)
+    return encode
