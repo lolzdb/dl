@@ -4,6 +4,9 @@ from PIL import ImageDraw
 import copy
 import json
 
+width=1024
+height=1024
+
 def static(dic,ilist,id):
     for i in ilist:
         if i['category'] not in dic:
@@ -118,8 +121,8 @@ class Bmap:
         return box.intersect(self.box)
 
     def isOut(self):
-       if self.box.xmax-self.box.xmin<=1024 and \
-               self.box.ymax-self.box.ymin<=1024:
+       if self.box.xmax-self.box.xmin<=width and \
+               self.box.ymax-self.box.ymin<=height:
            return False
        return True
 
@@ -157,10 +160,10 @@ class Crop:
         up=bmap.box.ymin
         w=bmap.box.xmax-bmap.box.xmin
         h=bmap.box.ymax-bmap.box.ymin
-        xmin=int(bmap.box.xmin-float(left)/(2048-w)*(1024-w))
-        ymin=int(bmap.box.ymin-float(up)/(2048-h)*(1024-h))
-        xmax=xmin+1024
-        ymax=ymin+1024
+        xmin=int(bmap.box.xmin-float(left)/(2048-w)*(width-w))
+        ymin=int(bmap.box.ymin-float(up)/(2048-h)*(height-h))
+        xmax=xmin+width
+        ymax=ymin+height
         if xmax>2048:
             s=xmax-2048
             xmax=2048
@@ -180,7 +183,7 @@ class Crop:
         b=box.pop(0)
         for i in self.boxs:
             l=b.distance(i)
-            if l!=0 and l<1024:
+            if l!=0 and l<width:
                 spare.append(copy.deepcopy(i))
         bmap=Bmap()
         bmap.add(b)
@@ -204,18 +207,18 @@ class Crop:
             if self.isin(bmap.xp,i)==False and bmap.cleaveb(i):
                 dl.append(copy.deepcopy(i))
         for i in dl:
-            i.xmin-=bmap.box.xmin
-            i.ymin-=bmap.box.ymin
-            i.xmax-=bmap.box.xmin
-            i.ymax-=bmap.box.ymin
+            i.xmin-=float(bmap.box.xmin)
+            i.ymin-=float(bmap.box.ymin)
+            i.xmax-=float(bmap.box.xmin)
+            i.ymax-=float(bmap.box.ymin)
             if i.xmin<0:
                 i.xmin=0
             if i.ymin<0:
                 i.ymin=0
-            if i.xmax>1024:
-                i.xmax=1024
-            if i.ymax>1024:
-                i.ymax=1024
+            if i.xmax>width:
+                i.xmax=width
+            if i.ymax>height:
+                i.ymax=height
         return dl
 
     def more(self):
@@ -278,7 +281,7 @@ def crop(ids,info,datapath,resultpath):
         index=0
         boxs=[]
         for k in info[i]['objects']:
-            box = [int(k['bbox']['xmin']), int(k['bbox']['ymin']), int(k['bbox']['xmax']), int(k['bbox']['ymax'])]
+            box = [k['bbox']['xmin'], k['bbox']['ymin'], k['bbox']['xmax'], k['bbox']['ymax']]
             boxs.append(Box(box,index,k['category']))
             index+=1
         regin,dl=cr.crop(boxs)
@@ -320,10 +323,10 @@ def crop(ids,info,datapath,resultpath):
 # regin,dl=cr.crop(boxs)
 # l=regin[0].getAll()
 # d=dl
-datapath='F:\\data\\train'
-resultpath='F:\\data\\crop'
+datapath='F:\\data\\test'
+resultpath='F:\\data\\ctest'
 result,json_file=parsefile("F:\\annotations.json","F:\\ids2")
-ids=getjson('F:\\data\\train\\ids.json')
+ids=getjson('F:\\data\\test\\ids.json')
 voc,ids=crop(ids,json_file['imgs'],datapath,resultpath)
 info={'imgs':voc}
 writejson(resultpath+'/nids.json',ids)

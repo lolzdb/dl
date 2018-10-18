@@ -7,6 +7,7 @@ from PIL import ImageEnhance
 from PIL import Image
 from PIL import ImageDraw
 import tensorflow as tf
+import matplotlib.pyplot as pl
 
 def int64_feature(value):
     """Wrapper for inserting int64 features into Example proto.
@@ -170,12 +171,18 @@ def mean(w,h,low,hight):
             hm+=j
             count+=1
     return wm/count,hm/count,count
-def drawfill(box,img):
+def drawfill(box,img,bdic,backpath):
     draw = ImageDraw.Draw(img)
     draw.rectangle((box['xmin'],box['ymin'],box['xmax'],box['ymax']),fill=(0, 0, 0))
 
 
-def clean(idspath,infopath,dic,datapath):
+def getback(backpath):
+    flist=[]
+    for file in os.listdir(backpath):
+        flist.append(file)
+    return flist
+
+def clean(idspath,infopath,dic,datapath,resultpath,bdic,backpath):
     idsfile=open(idspath)
     infofile=open(infopath)
     ids=json.load(idsfile)
@@ -187,21 +194,25 @@ def clean(idspath,infopath,dic,datapath):
         mark=0
         count=0
         img=Image.open(datapath+'/'+i+'.jpg')
+        back = random.sample(bdic, 1)
+        backfile = backpath + back[0]
+        bimg = Image.open(backfile)
         for k in info[i]['objects']:
             if k['category'] in dic:
                 object.append(k)
                 count+=1
-            else:
-                mark=1
-                drawfill(k['bbox'],img)
+            #else:
+                # box = (int(k['bbox']['xmin']), int(k['bbox']['ymin']), int(k['bbox']['xmax']), int(k['bbox']['ymax']))
+                # bregion = bimg.crop(box)
+                # img.paste(bregion,box)
+                #drawfill(k['bbox'], img, bdic, backpath)
         if count != 0:
             infoitem = {}
             infoitem['id'] = i
             infoitem['objects'] = object
             ninfo[i]=infoitem
             nids.append(i)
-            if mark !=0:
-                img.save(datapath+'/'+i+'.jpg')
+            img.save(resultpath+'/'+i+'.jpg')
         img.close()
     idsfile.close()
     infofile.close()
@@ -271,9 +282,8 @@ def stastic(dic,idspath,infopath):
         item['imgc'] = 0
         item['count']=0
         result[i]=item
-        print(i)
     for i in ids:
-        for k in info['imgs'][i]['objects']:
+        for k in info[i]['objects']:
             result[k['category']]['count']+=1
         for j in result:
             if result[j]['count']>0:
@@ -282,6 +292,18 @@ def stastic(dic,idspath,infopath):
                 result[j]['count'] = 0
     return result
 
+def putlist(sdata):
+    count=1
+    sumimg=0
+    sunc=0
+    for i in sdata:
+        print('\''+i+'\':('+str(count)+',\'Vehicle\'),')
+        count+=1
+    for i in sdata:
+        print('\''+i+'\':('+str(sdata[i]['imgc'])+','+str(sdata[i]['classc'])+'),')
+        sunc+=sdata[i]['classc']
+        sumimg+=sdata[i]['imgc']
+    print('\'total\':(' + str(sumimg) + ',' + str(sunc) + '),')
 
 # enhancepath="F:\\ndata\\enhance"
 # train="F:\\ndata\\train"
@@ -293,7 +315,7 @@ def stastic(dic,idspath,infopath):
 # trfl=getfilelist(train)
 #
 result,json_file=parsefile("F:\\data\\voc.json","F:\\data\\nids.json")
-fileter(result,100)
+#fileter(result,100)
 # data=getinfo(info)
 # dic=getdic(result)
 # ifle=getfilelist(train,dic,data)
@@ -301,8 +323,22 @@ fileter(result,100)
 #ri,j=convert(train,dic,trdata,trfl,resultpath,0,1)
 #ri,j=convert(enhancepath,dic,edata,efl,resultpath,ri,j)
 
-voc="F:\\ndata\\voc.json"
-ids="F:\\ndata\\ids.json"
-path="F:\\ndata\\trainxml"
+dic={'i4':1,
+'io':2,
+'p26':3,
+'pl100':4,
+'pl50':5,
+'pl60':6,
+'pl80':7,
+'po':8}
+
+infopath='F:\\ndata\\crop\\voc.json'
+idspath="F:\\ndata\\crop\\ids.json"
+path="F:\\ndata\\crop\\trainxml"
+backpath='F:\\data\\background\\'
+datapath='F:\\ndata\\crop\\crop'
+resultpath='F:\\ndata\\crop\\fill'
+bdic=getback(backpath)
 #stastic(result,ids,voc)
 #r=BatchRename('F:\\ndata\\source','F:\\ndata','F:\\ndata')
+#s=stastic(result,ids,voc)
